@@ -1,2 +1,2 @@
-# iCarey_Whitelist_System
-Web frontend and discord bot for Whitelisted Minecraft Servers
+# icarey_whitelist_system
+Web frontend, and Discord bot for Minecraft servers. 
