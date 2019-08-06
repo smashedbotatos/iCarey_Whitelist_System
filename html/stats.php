@@ -37,7 +37,19 @@
         </div>
     </div>
 </div>
+<div id="footer" class="container-fluid mt-3 py-2 text-center text-muted small">
+    <!--
+        LICENSE NOTE:
+        The "Attribution" part with respect to the CC BY-SA 4.0
+        license is that you provide a link to the original repository
+        like the one below.
 
+        If you remove it, please make sure it appears somewhere else!
+    -->
+    <a href="https://github.com/pdinklag/MinecraftStats">MinecraftStats</a>
+    &ndash; written by Patrick Dinklage a.k.a. "pdinklag".<br/>
+    Minecraft UI icons and default skins are trademarks and copyrights of <a href="http://mojang.com/">Mojang</a>.
+</div>
 <!-- Footer
 ================================================== -->
 <div class="container footer">
@@ -83,19 +95,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
         integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
         crossorigin="anonymous"></script>
-<script src="js/lib/pako_inflate-1.0.7.min.js"></script>
-<script src="js/lib/jquery-3.3.1.min.js"></script>
-<script src="js/lib/popper-1.14.3.min.js"></script>
-<script src="js/lib/bootstrap-4.1.3.min.js"></script>
 
-<script src="js/mcstats.js"></script>
-<script src="js/mcstats-widgets.js"></script>
-<script src="js/mcstats-awardlist.js"></script>
-<script src="js/mcstats-awardview.js"></script>
-<script src="js/mcstats-playerlist.js"></script>
-<script src="js/mcstats-playerview.js"></script>
-<script src="js/mcstats-hof.js"></script>
-<script src="js/mcstats-loader.js"></script>
-<script src="js/mcstats-start.js"></script>
+<script src="js/lib/pako_inflate-1.0.10.min.js"></script>
+<script src="js/lib/jquery-3.4.1.min.js"></script>
+<script src="js/lib/popper-1.15.0.min.js"></script>
+<script src="js/lib/bootstrap-4.3.1.min.js"></script>
+<script src="js/mcstats.min.js"></script>
+
 </body>
 </html>
