@@ -2,6 +2,7 @@
 import argparse
 import gzip
 import json
+import math
 import os
 import re
 import shutil
@@ -34,8 +35,10 @@ parser.add_argument('--inactive-days', type=int, required=False, default=7,
                     help='number of days after which a player is considered inactive (default 7)')
 parser.add_argument('--min-playtime', type=int, required=False, default=0,
                     help='number of minutes a player needs to have played before being eligible for any awards (default 0)')
-parser.add_argument('--store-uncompressed', required=False, action='store_true',
-                    help='if set, the database will also be stored in an uncompressed JSON form')
+parser.add_argument('--players-per-page', type=int, required=False, default=100,
+                    help='the number of players displayed on one page of the player list (default 100)')
+parser.add_argument('--player-cache-q', type=int, required=False, default=2,
+                    help='the UUID prefix length to build the playercache (default 2)')
 
 args = parser.parse_args()
 
@@ -45,6 +48,11 @@ def handle_error(e, die = False):
         exit(1)
 
 inactive_time = 86400 * args.inactive_days
+
+def is_active(last):
+    global inactive_time, now
+    return ((now - last) <= inactive_time)
+
 min_playtime = args.min_playtime
 profile_update_interval = 86400 * args.profile_update_interval
 
@@ -60,10 +68,25 @@ if not os.path.isdir(args.server):
 if not os.path.isdir(mcStatsDir):
     handle_error('no valid stat directory: ' + mcStatsDir, True)
 
-dbFilename = args.database + '/db.json'
-dbCompressedFilename = args.database + '/db.json.gz'
 dbRankingsPath = args.database + '/rankings'
 dbPlayerDataPath = args.database + '/playerdata'
+dbPlayerCachePath = args.database + '/playercache'
+
+playerCacheQ = args.player_cache_q
+playersPerPage = args.players_per_page
+
+dbPlayersFilename = args.database + '/players.json'
+dbSummaryFilename = args.database + '/summary.json.gz'
+
+dbPlayerListPath = args.database + '/playerlist'
+dbPlayerListAllFilename = dbPlayerListPath + '/all{}.json.gz'
+dbPlayerListActiveFilename = dbPlayerListPath + '/active{}.json.gz'
+
+# clean old format database
+oldDbFilename = args.database + '/db.json.gz'
+if os.path.isfile(oldDbFilename):
+    print('Removing deprecated database file: ' + oldDbFilename)
+    os.remove(oldDbFilename)
 
 # get server.properties motd if no server name is set
 if not args.server_name:
@@ -85,19 +108,21 @@ if not os.path.isdir(dbRankingsPath):
 if not os.path.isdir(dbPlayerDataPath):
     os.mkdir(dbPlayerDataPath)
 
-# load information from previous update
-if os.path.isfile(dbCompressedFilename):
-    try:
-        with gzip.open(dbCompressedFilename) as dbFile:
-            prev_db = json.loads(dbFile.read().decode())
+if not os.path.isdir(dbPlayerCachePath):
+    os.mkdir(dbPlayerCachePath)
 
-        players = prev_db['players']
-        last_update_time = prev_db['info']['updateTime']
+if not os.path.isdir(dbPlayerListPath):
+    os.mkdir(dbPlayerListPath)
+
+# load information from previous update
+if os.path.isfile(dbPlayersFilename):
+    try:
+        with open(dbPlayersFilename) as playersFile:
+            players = json.load(playersFile)
     except Exception as e:
-        print('error loading previous database: ' + dbCompressedFilename)
+        print('error loading previous database: ' + dbPlayersFilename)
         handle_error(e, True)
 else:
-    last_update_time = 0
     players = dict()
 
 # find available player IDs in stats dir
@@ -112,6 +137,7 @@ except Exception as e:
     handle_error(e, True)
 
 # update player data
+serverVersion = 0
 hof = mcstats.Ranking()
 
 for uuid, player in players.items():
@@ -121,20 +147,58 @@ for uuid, player in players.items():
         # got no data for this dude
         continue
 
+    # load data
+    try:
+        with open(dataFilename) as dataFile:
+            data = json.load(dataFile)
+    except Exception as e:
+        print('failed to update player data for ' + uuid)
+        handle_error(e)
+        continue
+
+    # check data version
+    if 'DataVersion' in data:
+        version = data['DataVersion']
+    else:
+        version = 0
+
+    if version < 1451: # 17w47a is the absolute minimum
+        print('unsupported data version ' + str(version) + ' for ' + uuid)
+        continue
+
+    serverVersion = max(serverVersion, version)
+
+    # collapse stats
+    stats = data['stats']
+
+    # get amount of time played
+    playtimeTicks = 0
+    if 'minecraft:custom' in stats:
+        custom = stats['minecraft:custom']
+        if 'minecraft:play_one_minute' in custom:
+            playtimeTicks = custom['minecraft:play_one_minute']
+
+    playtimeMinutes = playtimeTicks / (20 * 60);
+    if playtimeMinutes < min_playtime:
+        # invalidate player and continue
+        player.pop('name', None)
+        player.pop('last', None)
+        continue
+
     # get last play time and determine activity
     last = int(os.path.getmtime(dataFilename))
     player['last'] = last
 
-    inactive = ((now - last) > inactive_time)
+    active = is_active(last)
 
     # update skin
-    if (not 'name' in player) or args.update_inactive or (not inactive):
-        if 'profile_time' in player:
-            profile_time = player['profile_time']
+    if (not 'name' in player) or args.update_inactive or active:
+        if 'update' in player:
+            update_time = player['update']
         else:
-            profile_time = 0
+            update_time = 0
 
-        if (not 'skin' in player) or (now - profile_time > profile_update_interval):
+        if (not 'skin' in player) or (now - update_time > profile_update_interval):
             try:
                 print('updating profile for ' + uuid + ' ...')
                 try:
@@ -158,43 +222,15 @@ for uuid, player in players.items():
                 player['skin'] = skin
 
                 # profile updated
-                player['profile_time'] = now
+                player['update'] = now
 
             except Exception as e:
                 print('failed to update profile for ' + player['name'] + ' (' + uuid + ')')
                 handle_error(e)
+                continue
 
     # cache name
     name = player['name']
-
-    # load data
-    try:
-        with open(dataFilename) as dataFile:
-            data = json.load(dataFile)
-    except Exception as e:
-        print('failed to update player data for ' + name + ' (' + uuid + ')')
-        handle_error(e)
-        continue
-
-    # check data version
-    if 'DataVersion' in data:
-        version = data['DataVersion']
-    else:
-        version = 0
-
-    if version < 1451: # 17w47a is the absolute minimum
-        print('unsupported data version ' + str(version) + ' for ' + name +
-            ' (' + uuid + ')')
-        continue
-
-    # collapse stats
-    stats = data['stats']
-
-    # get amount of time played
-    playtimeTicks = stats['minecraft:custom']['minecraft:play_one_minute'];
-    playtimeMinutes = playtimeTicks / (20 * 60);
-    if playtimeMinutes < min_playtime:
-        continue
 
     # init database data
     playerStats = dict()
@@ -214,21 +250,27 @@ for uuid, player in players.items():
             value = mcstat.read(stats)
             playerStats[mcstat.name] = {'value':value}
 
-            if not inactive:
+            if active:
                 mcstat.enter(uuid, value)
 
     # init crown score
-    if not inactive:
+    if active:
         crown = mcstats.CrownScore()
         player['crown'] = crown
         hof.enter(uuid, crown)
 
 # compute award rankings
+summaryPlayerIds = set()
 awards = dict()
 
 for mcstat in mcstats.registry:
     if not isinstance(mcstat, mcstats.Ranking):
         # this may be a legacy stat that doesn't have its own ranking
+        continue
+
+    if serverVersion < mcstat.minVersion:
+        print('stat "' + mcstat.name + '" is not supported by server version '
+              + str(serverVersion) + ' (required: ' + str(mcstat.minVersion) + ')')
         continue
 
     if mcstat.name in awards:
@@ -259,42 +301,54 @@ for mcstat in mcstats.registry:
     award = mcstat.meta
     if(len(mcstat.ranking) > 0):
         best = mcstat.ranking[0]
-        award['best'] = {'uuid':best.id,'value':best.value}
+        award['best'] = {'uuid': best.id, 'value': best.value}
+        summaryPlayerIds.add(best.id)
 
     # add to award info list
     awards[mcstat.name] = award
 
-# compute and write hall of fame
-hof.sort()
-outHallOfFame = []
-for entry in hof.ranking:
-    if entry.value.score[0] == 0:
-        break
+# filter valid players
+validPlayers = dict()
+serverPlayers = dict()
 
-    outHallOfFame.append({'uuid':entry.id,'value':entry.value.score})
-
-# write player data and construct player cache
-playerCache = dict()
+playerlist = []
+numActivePlayers = 0
 
 for uuid, player in players.items():
-    # skip players with no data
-    if ('last' not in player) or ('name' not in player):
-        continue
+    if ('last' in player) and ('name' in player):
+        validPlayers[uuid] = player
 
-    playerCache[uuid] = {
-        'name':         player['name'],
-        'last':         player['last'],
-    }
+        name = player['name']
+        skin = player['skin']
+        last = player['last']
 
-    if 'profile_time' in player:
-        playerCache[uuid]['profile_time'] = player['profile_time']
+        serverPlayers[uuid] = {
+            'name': name,
+            'skin': skin,
+            'last': last,
+            'update': player['update']
+        }
 
-    if 'skin' in player:
-        playerCache[uuid]['skin'] = player['skin']
+        clientInfo = {
+            'uuid': uuid,
+            'name': name,
+            'skin': skin,
+            'last': last,
+        }
 
-    if 'stats' in player:
+        playerlist.append(clientInfo)
+
+        if is_active(last):
+            numActivePlayers += 1
+
         with open(dbPlayerDataPath + '/' + uuid + '.json', 'w') as dataFile:
             json.dump(player['stats'], dataFile)
+
+players = validPlayers
+
+# write players for next server update
+with open(dbPlayersFilename, 'w') as playersFile:
+    json.dump(serverPlayers, playersFile)
 
 # copy server icon if available
 if os.path.isfile(args.server + '/server-icon.png'):
@@ -303,27 +357,84 @@ if os.path.isfile(args.server + '/server-icon.png'):
 else:
     has_icon = False
 
-# construct update info
+# gather info for client
 info = {
     'hasIcon': has_icon,
     'serverName': args.server_name,
     'updateTime': int(now),
-    'inactiveDays': args.inactive_days
+    'inactiveDays': args.inactive_days,
+    'minPlayTime': min_playtime,
+    'cacheQ': playerCacheQ,
+    'numPlayers': len(playerlist),
+    'numActive': numActivePlayers,
+    'playersPerPage': playersPerPage,
 }
 
-# compile database
-db = {
+# write hall of fame for client
+# compute hall of fame
+hof.sort()
+outHof = []
+for entry in hof.ranking:
+    if entry.value.score[0] == 0:
+        break
+
+    outHof.append({
+        'uuid': entry.id,
+        'value': entry.value.score
+    })
+    summaryPlayerIds.add(entry.id)
+
+# summary players
+summaryPlayers = dict()
+for uuid in summaryPlayerIds:
+    player = players[uuid]
+    summaryPlayers[uuid] = {
+        'name': player['name'],
+        'skin': player['skin'] if ('skin' in player) else False,
+        'last': player['last'],
+    }
+
+# write summary for client
+summary = {
     'info': info,
+    'players': summaryPlayers,
     'awards': awards,
-    'players': playerCache,
-    'hof': outHallOfFame
+    'hof': outHof,
 }
 
-# write compressed database (for client)
-with gzip.open(dbCompressedFilename, 'wb') as dbFile:
-    dbFile.write(json.dumps(db).encode())
+with gzip.open(dbSummaryFilename, 'wb') as summaryFile:
+    summaryFile.write(json.dumps(summary).encode())
 
-# write uncompressed database
-if args.store_uncompressed:
-    with open(dbFilename, 'w') as dbFile:
-        json.dump(db, dbFile)
+# create player cache for client
+playercache = dict()
+for uuid, player in players.items():
+    key = uuid[:playerCacheQ]
+    if not key in playercache:
+        playercache[key] = list()
+
+    playercache[key].append({
+        'uuid': uuid,
+        'name': player['name'],
+        'skin': player['skin'] if ('skin' in player) else False,
+        'last': player['last']
+    })
+
+for key, cache in playercache.items():
+    with open(dbPlayerCachePath + '/' + key + '.json', 'w') as cacheFile:
+        json.dump(cache, cacheFile)
+
+# write player list (all players)
+playerlist = sorted(playerlist, key=lambda x: x['name'].lower())
+for i in range(0, len(playerlist), playersPerPage):
+    page = int(i / playersPerPage)
+    with gzip.open(dbPlayerListAllFilename.format(page + 1), 'wb') as f:
+        f.write(json.dumps(
+            playerlist[i : i + playersPerPage]).encode())
+
+# write active player list
+playerlist = list(filter(lambda x: is_active(x['last']), playerlist))
+for i in range(0, len(playerlist), playersPerPage):
+    page = int(i / playersPerPage)
+    with gzip.open(dbPlayerListActiveFilename.format(page + 1), 'wb') as f:
+        f.write(json.dumps(
+            playerlist[i : i + playersPerPage]).encode())

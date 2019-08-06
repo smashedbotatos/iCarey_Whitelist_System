@@ -8,8 +8,8 @@ const mysql = require('../lib/mysql.js');
 
 module.exports = {
     name: 'update',
-    description: 'tests a command',
-    usage: 'skin username',
+    description: 'updates players skin',
+    usage: '{skin} {username} [playername] [newplayername]',
     cooldown: 0,
     execute(message, args) {
 

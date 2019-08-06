@@ -5,8 +5,8 @@ const rcon = require('../lib/rcon.js');
 
 module.exports = {
     name: 'ban',
-    description: 'Bans a user from the discord server.',
-    usage: 'ban/pardon/appeal username',
+    description: 'Minecraft Server Ban Management',
+    usage: '{ban} {pardon} {appeal} username {appeal reason} {ban reason}',
     cooldown: 5,
 
     execute(message, args, client) {
@@ -17,7 +17,7 @@ module.exports = {
 
         if (!args.length > 0 || args[0].toLowerCase() === 'help') {
             data.push('You must include an action and arguments.');
-            data.push('Example: ban Smashedbotatos');
+            data.push('Example: ban Smashedbotatos xraying and duping');
             data.push('Example: pardon Smashedbotatos');
             data.push('Example: appeal Smashedbotatos I didn\'t mean to use xray or dupe items. I have learned my lesson.');
             data.push('Example: list');

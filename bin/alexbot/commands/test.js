@@ -2,7 +2,7 @@ const mojang = require('../lib/mojang.js');
 
 module.exports = {
     name: 'test',
-    description: 'tests a command',
+    description: 'test command',
     usage: 'uuid',
     cooldown: 0,
     execute(message, args) {

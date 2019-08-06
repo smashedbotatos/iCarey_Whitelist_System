@@ -1,13 +1,11 @@
-//TODO This needs TESTED
-
 var main = require('../AlexBot.js');
 const config = require('../config.json');
 const Discord = require('discord.js');
 
 module.exports = {
     name: 'whitelist',
-    description: 'Apply/Add/Remove for the server whitelist',
-    usage: 'apply add remove waiting',
+    description: 'Minecraft Server Whitelist Management',
+    usage: '{approve}{remove}{waiting} [username]',
     cooldown: 5,
     execute(message, args, client) {
         uData = [];

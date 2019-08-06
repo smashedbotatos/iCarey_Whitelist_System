@@ -15,8 +15,14 @@
 <div class="container well well-icarey">
     <div class="row">
         <div class="col col-12">
-            <div class="clearfix text-center">
-                Last update: <span id="update-time" class="text-info">(last update)</span>
+            <div id="header" class="clearfix text-center">
+                <div id="info" class="float-right ml-auto mr-2 mt-4 p-2 round-box small text-right" style="display:none;">
+                    <img id="server-icon" class="mr-1 img-textsize-3 align-bottom" title="" src="data/server-icon.png"/>
+                    <span id="server-name" class="d-none d-sm-inline text-shadow">(server name)</span>
+                    <div class="small text-muted">
+                        Last update: <span id="update-time" class="text-info">(last update)</span>
+                    </div>
+                </div>
             </div>
             <div id="loader" class="container text-center mt-2">
                 <img class="img-pixelated img-textsize-8" src="img/loader.gif"/>
@@ -26,30 +32,30 @@
                 <div id="view" class="container mx-auto">
                     <div class="h1 my-4 text-center">
                         <img id="view-icon" class="img-pixelated img-left img-textsize align-baseline"/>
-                        <span id="view-title" class="text-underline text-shadow">(view title)</span>
+                        <span id="view-title" class="text-underline text-shadow">(view title)</h1>
                     </div>
                     <h5 id="view-subtitle" class="text-center text-shadow">(view subtitle)</h5>
                     <div id="view-desc" class="mb-2 text-muted text-center text-shadow">(view desc)</div>
                     <div id="view-content">(view content)</div>
                 </div>
+                <div id="footer" class="container-fluid mt-3 py-2 text-center text-muted small">
+                    <!--
+                        LICENSE NOTE:
+                        The "Attribution" part with respect to the CC BY-SA 4.0
+                        license is that you provide a link to the original repository
+                        like the one below.
 
+                        If you remove it, please make sure it appears somewhere else!
+                    -->
+                    <a href="https://github.com/pdinklag/MinecraftStats">MinecraftStats</a>
+                    &ndash; written by Patrick Dinklage a.k.a. "pdinklag".<br/>
+                    Minecraft UI icons and default skins are trademarks and copyrights of <a href="http://mojang.com/">Mojang</a>.
+                </div>
             </div>
         </div>
     </div>
 </div>
-<div id="footer" class="container-fluid mt-3 py-2 text-center text-muted small">
-    <!--
-        LICENSE NOTE:
-        The "Attribution" part with respect to the CC BY-SA 4.0
-        license is that you provide a link to the original repository
-        like the one below.
 
-        If you remove it, please make sure it appears somewhere else!
-    -->
-    <a href="https://github.com/pdinklag/MinecraftStats">MinecraftStats</a>
-    &ndash; written by Patrick Dinklage a.k.a. "pdinklag".<br/>
-    Minecraft UI icons and default skins are trademarks and copyrights of <a href="http://mojang.com/">Mojang</a>.
-</div>
 <!-- Footer
 ================================================== -->
 <div class="container footer">
@@ -101,6 +107,5 @@
 <script src="js/lib/popper-1.15.0.min.js"></script>
 <script src="js/lib/bootstrap-4.3.1.min.js"></script>
 <script src="js/mcstats.min.js"></script>
-
 </body>
 </html>

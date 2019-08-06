@@ -8,7 +8,7 @@ const Discord = require('discord.js');
 module.exports = {
     name: 'stats',
     description: 'Users Minecraft stats.',
-    usage: 'username',
+    usage: '[username]',
     args: true,
     cooldown: 5,
 
